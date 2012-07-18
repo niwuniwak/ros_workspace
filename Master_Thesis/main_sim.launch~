@@ -1,0 +1,142 @@
+<launch>
+
+	
+<!--minimal.launch-->
+	  <param name="/use_sim_time" value="false"/>
+
+	  <arg name="urdf_file" default="$(find xacro)/xacro.py '$(find turtlebot_description)/robots/turtlebot.urdf.xacro'" />
+	  <param name="robot_description" command="$(arg urdf_file)" />
+
+	  <param name="robot/name" value="$(optenv ROBOT turtlebot)"/>
+	  <param name="robot/type" value="turtlebot"/>
+
+	  <include file="$(find turtlebot_bringup)/app_manager.launch" />
+
+	  <!-- Turtlebot Driver -->
+	  <node pkg="turtlebot_node" type="turtlebot_node.py" name="turtlebot_node" output="screen" respawn="true" args="--respawnable">
+	    <remap from="cmd_vel" to="cmd_vel_rect"/>
+	    <param name="bonus" value="false" />
+	    <param name="update_rate" value="30.0" />
+	    <param name="has_gyro" value="false" />
+	    <!--<param name="set_operation_mode" value="full"/>
+	    <param name="gyro_scale_correction" value="1.010627"/>
+  	    <param name="odom_angular_scale_correction" value="1.008419"/>-->
+	  </node>
+
+	  <!-- Turtlebot Laptop Battery Diagnostics -->
+	  <node pkg="turtlebot_node" type="laptop_battery.py" name="turtlebot_laptop_battery">
+	  </node>
+
+	  <node pkg="robot_state_publisher" type="state_publisher" name="robot_state_publisher" output="screen">
+	    <param name="publish_frequency" type="double" value="5.0" />
+	    <!--param name="tf_prefix" type="string" value="" /-->
+	  </node>
+
+	  <node pkg="diagnostic_aggregator" type="aggregator_node" name="diagnostic_aggregator" >
+	    <!-- Load the file you made above -->
+	    <rosparam command="load" file="$(find turtlebot_bringup)/config/diagnostics.yaml" />
+	  </node>
+
+	  <!-- The odometry estimator -->
+	   <node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf">
+	    <param name="freq" value="30.0"/>
+	    <param name="sensor_timeout" value="1.0"/>
+	    <param name="publish_tf" value="true"/>
+	    <param name="odom_used" value="true"/>
+	    <param name="imu_used" value="true"/>
+	    <param name="vo_used" value="false"/>
+	    <param name="output_frame" value="odom"/>
+	    <param name="debug" value="false"/>
+    	    <param name="self_diagnose" value="false"/>
+	    <remap from="imu_data" to="imu/data"/>
+	  </node>
+
+
+	<!-- Enable breaker 1 for the kinect -->
+	  <node pkg="turtlebot_node" type="kinect_breaker_enabler.py" name="kinect_breaker_enabler"/>
+
+<!-- Kinect -->
+	  <node pkg="nodelet" type="nodelet" name="openni_manager" output="screen" respawn="true" args="manager"/>
+
+	  <node pkg="nodelet" type="nodelet" name="openni_camera" args="load openni_camera/OpenNINodelet openni_manager" respawn="true">
+	    <param name="rgb_frame_id" value="/openni_rgb_optical_frame" />
+	    <param name="depth_frame_id" value="/openni_depth_optical_frame" />
+	    <param name="depth_registration" value="true" />
+	    <param name="image_mode" value="2" />
+	    <param name="depth_mode" value="2" />
+	    <param name="debayering" value="2" />
+	    <param name="depth_time_offset" value="-0.055" />
+	    <param name="image_time_offset" value="0" />
+
+	    <rosparam command="load" file="$(find openni_camera)/info/openni_params.yaml" />
+	  </node>
+
+	<!-- throttling -->
+	<node pkg="nodelet" type="nodelet" name="pointcloud_throttle" args="load Master_Thesis/CloudThrottle openni_manager">
+		<param name="max_rate" value="5"/>
+		<remap from="cloud_in" to="/camera/rgb/points"/>
+		<remap from="cloud_out" to="cloud_throttled"/>
+	</node>
+
+	<!-- Fake Laser -->
+	  <node pkg="nodelet" type="nodelet" name="kinect_laser" args="load pointcloud_to_laserscan/CloudToScan openni_manager" respawn="true">
+	    <param name="output_frame_id" value="/camera_depth_frame"/>
+	    <!-- heights are in the (optical?) frame of the kinect -->
+	    <param name="min_height" value="-0.15"/>
+	    <param name="max_height" value="0.15"/>
+	    <remap from="cloud" to="/cloud_throttled"/>
+	  </node>
+
+	  <!-- Fake Laser (narrow one, for localization -->
+	  <node pkg="nodelet" type="nodelet" name="kinect_laser_narrow" args="load pointcloud_to_laserscan/CloudToScan openni_manager" respawn="true">
+	    <param name="output_frame_id" value="/camera_depth_frame"/>
+	    <!-- heights are in the (optical?) frame of the kinect -->
+	    <param name="min_height" value="-0.025"/>
+	    <param name="max_height" value="0.025"/>
+	    <remap from="cloud" to="/cloud_throttled"/>
+	    <remap from="scan" to="/narrow_scan"/>
+	  </node>
+
+	<node pkg="dynamic_reconfigure" type="dynparam" name="dynparam" args="set camera/driver depth_registration true" />
+
+
+	<node pkg="Master_Thesis" type="kinect_tf_broadcaster.py" name="kinect_tf_broadcaster">
+		<param name="pitch"  value="0.0"/>
+	</node>
+
+	<node pkg="nodelet" type="nodelet" name="passthrough" args="load pcl/PassThrough openni_manager" output="screen">
+		<remap from="/passthrough/input" to="/cloud_throttled" />
+		<remap from="~output" to="/x_filtered_rect/rgb/points"/>
+		<param name="output_frame" value="/laser"/>
+		<rosparam>
+filter_field_name: y
+filter_limit_min: -0.0635
+filter_limit_max: 0.355
+filter_limit_negative: False
+keep_organized : true
+</rosparam>
+	</node>
+
+	
+
+	<!-- Run the map server-->
+	  <arg name="map_file" default="/home/yannis/ros_workspace/Master_Thesis/my_map.yaml"/>
+	  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" />
+
+	   <!--Run AMCL-->
+	  <include file="$(find turtlebot_navigation)/config/amcl_turtlebot.launch" />
+
+	   <!--Run Move Base-->
+	    <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+	    <rosparam file="$(find turtlebot_navigation)/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+	    <rosparam file="$(find turtlebot_navigation)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+	    <rosparam file="$(find turtlebot_navigation)/config/local_costmap_params.yaml" command="load" />
+	    <rosparam file="$(find turtlebot_navigation)/config/global_costmap_params.yaml" command="load" />
+	    <rosparam file="$(find turtlebot_navigation)/config/base_local_planner_params.yaml" command="load" />
+	    <remap from="cmd_vel" to="cmd_vel_nav"/>
+  	    <param name="controller_frequency" value="5"/>
+	  </node>
+
+	<!--<node pkg="Master_Thesis" name="processPoint" type="points"/>-->
+
+</launch>

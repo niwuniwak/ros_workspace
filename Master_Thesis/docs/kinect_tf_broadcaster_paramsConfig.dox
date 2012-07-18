@@ -1,0 +1,7 @@
+\subsubsection parameters ROS parameters
+
+Reads and maintains the following parameters on the ROS server
+
+- \b "~roll" : \b [double] Roll min: -3.14159265359, default: 0.0, max: 3.14159265359
+- \b "~pitch" : \b [double] Pitch min: -3.14159265359, default: 0.0, max: 3.14159265359
+

@@ -1,0 +1,13 @@
+void odomCB(const nav_msgs::Odometry::ConstPtr& msg)
+		{
+    	double xPos=msg->pose.pose.position.x;
+    	double yPos=msg->pose.pose.position.y;
+    	//get Quaternion anglular information
+    	double x=msg->pose.pose.orientation.x;
+    	double y=msg->pose.pose.orientation.y;
+    	double z=msg->pose.pose.orientation.z;
+    	double w=msg->pose.pose.orientation.w;
+    	//convert to pitch
+    	double angle=atan2(2*(y*x+w*z),w*w+x*x-y*y-z*z);
+    	ROS_ERROR("%f %f %f",xPos,yPos,angle);
+		};

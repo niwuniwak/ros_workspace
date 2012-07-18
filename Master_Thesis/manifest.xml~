@@ -1,0 +1,34 @@
+<package>
+  <description brief="Master_Thesis">
+
+     Master_Thesis
+
+  </description>
+  <author>yannis</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/Master_Thesis</url>
+  <depend package="std_msgs"/>
+  <depend package="roscpp"/>
+  <depend package="openni_camera"/>
+  <!--<depend package="cv_bridge"/>-->
+  <depend package="opencv2"/>
+  <!--<depend package="image_transport"/>-->
+  <depend package="nav_msgs"/>
+  <depend package="nodelet"/>
+  <depend package="pcl_ros"/>
+  <depend package="pcl"/>
+  <!--<depend package="sensor_msgs"/>-->
+  <depend package="rospy"/>
+  <depend package="dynamic_reconfigure"/>
+  <depend package="tf"/>
+  <depend package="visualization_msgs"/>
+
+<export>
+    <nodelet plugin="${prefix}/nodelets.xml" />
+  </export>
+
+
+</package>
+
+

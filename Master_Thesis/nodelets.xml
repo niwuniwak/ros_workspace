@@ -1,0 +1,9 @@
+<library path="lib/libMaster_Thesis">
+
+  <class name="Master_Thesis/CloudThrottle" type="Master_Thesis::CloudThrottle" base_class_type="nodelet::Nodelet">
+    <description>
+      Throttle point clouds
+    </description>
+  </class>
+
+</library>

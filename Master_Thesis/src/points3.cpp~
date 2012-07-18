@@ -1,0 +1,192 @@
+#include <ros/ros.h>
+#include <pcl_ros/point_cloud.h>
+#include <sensor_msgs/PointCloud2.h>
+#include "pcl_ros/point_cloud.h"
+#include "pcl/point_types.h"
+#include "pcl/ros/conversions.h"
+//#include <pcl/visualization/cloud_viewer.h>
+#include <boost/foreach.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include "cv.h"
+#include "sensor_msgs/Image.h"
+
+using namespace ros;
+using namespace cv;
+
+typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
+static const char WINDOW[] = "Rgb image";
+
+class processPoint 
+	{
+public:
+    	NodeHandle nh;
+    	Subscriber sub;
+	Mat curr_img;
+	Mat grey_prev_img;
+	Mat grey_curr_img;
+	IplImage* Horn_H;
+	IplImage* Horn_V;
+	Mat matHorn_H;
+	Mat matHorn_V;
+	CvMat prev_imgOLD;
+	CvMat curr_imgOLD;
+
+    	processPoint() 
+	{
+        sub = nh.subscribe<sensor_msgs::PointCloud2>("camera/rgb/points", 1, &processPoint::processCloud, this);
+	curr_img = Mat::zeros(480, 640, CV_8UC3);
+	grey_prev_img = Mat::zeros(480, 640, CV_8UC1);
+	grey_curr_img = Mat::zeros(480, 640, CV_8UC1);
+	Horn_H = cvCreateImage(cvSize(640, 480), IPL_DEPTH_32F,1);
+    	Horn_V = cvCreateImage(cvSize(640, 480), IPL_DEPTH_32F,1);
+	matHorn_H = Mat::zeros(480, 640, CV_32FC1);
+	matHorn_V = Mat::zeros(480, 640, CV_32FC1);
+	namedWindow(WINDOW);
+	cvStartWindowThread();
+    	}
+
+    	~processPoint()
+	{   
+	cv::destroyWindow(WINDOW);
+     	}
+
+    	void processCloud( const sensor_msgs::PointCloud2ConstPtr& cloud );
+	void Horn_CV(Mat &grey_prev_img, Mat &grey_curr_img, IplImage* &Horn_H, IplImage* &Horn_V);
+	void Draw_OF(Mat OF_H, Mat OF_V);
+	};
+
+void processPoint::processCloud( const sensor_msgs::PointCloud2ConstPtr& cloud ) 
+	{
+	//ROS_DEBUG("New cloud !\n");
+	PointCloud::Ptr cloudptr (new PointCloud);
+	pcl::fromROSMsg( *cloud, *cloudptr);
+	
+	
+
+	/*pcl::visualization::CloudViewer viewer ("3D Pineapple Viewer");
+   	viewer.showCloud (cloudptr);*/
+	
+	int height, width;
+	height = cloudptr->height;
+	width = cloudptr->width;
+	//ROS_INFO("width x height = %dx%d\n", width, height);
+
+	/*BOOST_FOREACH (pcl::PointXYZRGB pt, cloudptr->points) 
+		{
+		
+
+		}*/
+	//pcl::PointCloud<pcl::PointXYZRGB>::iterator pt_iter = *cloudptr.begin();
+	 for (int j=0; j<height; j++)
+			{for (int i=0; i<width; i++)
+				{
+				curr_img.at<Vec3b>(j,i)[2]=cloudptr->points[i+((width)*j)].r;
+				//printf("test: %d\n", curr_img.at<Vec3b>(i,j)[0]);
+				curr_img.at<Vec3b>(j,i)[1]=cloudptr->points[i+((width)*j)].g;
+				curr_img.at<Vec3b>(j,i)[0]=cloudptr->points[i+((width)*j)].b;
+				}
+			}
+	
+	cvtColor(curr_img, grey_curr_img, CV_RGB2GRAY);
+	//grey_curr_img = Mat(grey_curr_img);
+	//imshow(WINDOW, grey_curr_img);
+	/*int num_ch = prev_curr_img.channels();
+	printf("num channels: %d\n", num_ch);*/
+	Horn_CV(grey_prev_img, grey_curr_img, Horn_H, Horn_V);
+	grey_prev_img = grey_curr_img;
+	//cv::waitKey(3);
+
+	}
+
+void processPoint::Horn_CV(Mat &grey_prev_img, Mat &grey_curr_img, IplImage* &Horn_H, IplImage* &Horn_V)
+	{
+	double lambda = 0.5;
+	int use_previous = 0;
+	
+	prev_imgOLD = CvMat(grey_prev_img);
+	curr_imgOLD = CvMat(grey_curr_img);
+
+	cvCalcOpticalFlowHS( &prev_imgOLD, &curr_imgOLD, use_previous, Horn_H, Horn_V, lambda, cvTermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 10, 1e-6));
+	matHorn_H = Horn_H;
+	matHorn_V = Horn_V;
+	Draw_OF(matHorn_H, matHorn_V);
+	}
+
+void processPoint::Draw_OF(Mat OF_H, Mat OF_V)
+    {//Drawing the arrows of OF on the picture
+	IplImage image_flow = grey_curr_img;
+	
+	for (int j=4; j<636; j=j+9)
+		{for (int i=4; i<476; i=i+9)
+			{
+			float line_thickness;				line_thickness = 0.001;
+			/* CV_RGB(red, green, blue) is the red, green, and blue components
+		 	* of the color you want, each out of 255.*/
+
+			CvScalar line_color;			line_color = CV_RGB(255, 0, 0);
+
+			CvPoint p,q;
+			p.x = j;
+			p.y = i;
+			float avg_OF_H=0;
+			float avg_OF_V=0;
+			int n=0;
+			for(int l=(j-4); l<=(j+4); l++)
+				{for(int k=(i-4); k<=(i+4); k++)
+					{if(abs(OF_H.at<float>(k,l)<20))
+						{avg_OF_H += OF_H.at<float>(k,l);
+						n=n+1;
+					 	}
+					}
+				}
+			avg_OF_H = avg_OF_H/n;
+			if(abs(avg_OF_H)<20)//OF_H.at<float>(i,j))<200)				
+			{q.x = p.x +(int)round(avg_OF_H);}//OF_H.at<float>(i,j));}
+			else q.x=p.x;
+			//printf("p.x : %d\n", p.x);
+			//printf("q.x : %d\n", q.x);		
+			if(q.x<0) q.x=p.x;
+			else if(q.x>639) q.x=p.x;
+			int m=0;
+			for(int l=(j-4); l<=(j+4); l++)
+				{for(int k=(i-4); k<=(i+4); k++)
+					{if(abs(OF_V.at<float>(k,l))<20)
+						{avg_OF_V += OF_V.at<float>(k,l);
+						m=m+1;
+						}
+					}
+				}	
+			avg_OF_V = avg_OF_V/m;
+			if(abs(avg_OF_V)<20)//OF_V.at<float>(i,j))<200)			
+			{q.y = p.y +(int)round(avg_OF_V);}//OF_V.at<float>(i,j));}
+			else q.y=p.y;
+			//printf("q.y : %d\n", q.y);
+			if(q.y<0) q.y=p.y;
+			else if(q.y>639) q.y=p.y;
+
+	//IplImage ipl_img = img;
+	//CvMat cvmat = img;
+
+			//q.x = p.x +(int)round(OF_H.at<float>(i,j));
+			//q.y = p.y +(int)round(OF_V.at<float>(i,j));
+
+			cvLine(&image_flow, p, q, line_color, line_thickness, CV_AA, 0 );
+			}
+		}	
+	cvShowImage(WINDOW, &image_flow);
+	//cv::imshow(WINDOW, curr_img);
+	// confirmation of finishing the OF computation
+	//printf("yeeeey i finished computing OF \n");
+	}
+
+int main(int argc, char **argv) 
+	{
+
+	init(argc, argv, "processPoint");
+
+	processPoint processPoint;
+
+	spin();
+	return 0;
+	}

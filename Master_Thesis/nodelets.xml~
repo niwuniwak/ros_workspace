@@ -1,0 +1,9 @@
+<library path="lib/libMaster_Thesis">
+
+  <class name="pcl_to_scan/CloudThrottle" type="pcl_to_scan::CloudThrottle" base_class_type="nodelet::Nodelet">
+    <description>
+      Throttle point clouds
+    </description>
+  </class>
+
+</library>

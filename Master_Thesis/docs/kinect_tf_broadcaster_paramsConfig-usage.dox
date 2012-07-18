@@ -1,0 +1,8 @@
+\subsubsection usage Usage
+\verbatim
+<node name="kinect_tf_broadcaster" pkg="Master_Thesis" type="kinect_tf_broadcaster">
+  <param name="roll" type="double" value="0.0" />
+  <param name="pitch" type="double" value="0.0" />
+</node>
+\endverbatim
+

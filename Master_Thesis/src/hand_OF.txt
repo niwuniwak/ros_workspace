@@ -1,0 +1,66 @@
+void Horn_OF(Mat prev_img, Mat curr_img)
+  		{
+  		int a =0.5;
+
+		Mat I1 = prev_img;
+		Mat I2 = curr_img;
+		Mat Ix = Mat::zeros(480, 640, CV_32FC1);
+		Mat Iy = Mat::zeros(480, 640, CV_32FC1);
+		Mat It = Mat::zeros(480, 640, CV_32FC1);
+		Mat Fx = Mat::zeros(480, 640, CV_32FC1);
+		Mat Fy = Mat::zeros(480, 640, CV_32FC1);
+		Mat tempFx = Mat::zeros(480, 640, CV_32FC1);
+		Mat tempFy = Mat::zeros(480, 640, CV_32FC1);
+		Mat r  = Mat::zeros(480, 640, CV_32FC1);
+		int I000, I001, I010, I011, I100, I101, I110, I111;
+
+		for (int j=0; j<640; j++)
+			{for (int i=0; i<480; i++)
+				{
+				I000 = (int)I1.at<uint8_t>(i,j);
+				I001 = (int)I2.at<uint8_t>(i,j);	
+				I010 = (int)I1.at<uint8_t>(i,j+1);
+				I011 = (int)I2.at<uint8_t>(i,j+1);
+				I100 = (int)I1.at<uint8_t>(i+1,j);
+				I101 = (int)I2.at<uint8_t>(i+1,j);
+				I110 = (int)I1.at<uint8_t>(i+1,j+1);
+				I111 = (int)I2.at<uint8_t>(i+1,j+1);
+
+
+				Ix.at<float>(i,j) = ((I100+I110+I101+I111)-(I000+I010+I001+I011))/4.0 ;
+				//printf("Ix : %f \n", Ix.at<float>(i,j));
+				//printf("I100+... : %f \n", (I100+I110+I101+I111)-(I000+I010+I001+I011));
+				Iy.at<float>(i,j) = ((I010+I110+I011+I111)-(I000+I100+I001+I101))/4.0 ;
+				It.at<float>(i,j) = ((I001+I101+I011+I111)-(I000+I100+I010+I110))/4.0 ;
+
+				}
+			}
+ 		
+		int n=1;
+		while (n<10)
+			{for (int l=1; l<639; l++)
+				{for (int k=1; k<479; k++)
+					{
+					Horn_H.at<float>(k,l) = (Fx.at<float>(k-1,l)+Fx.at<float>(k+1,l)+Fx.at<float>(k,l-1)+Fx.at<float>(k,l+1))/6+(Fx.at<float>(k-1,l-1)+Fx.at<float>(k-1,l+1)+Fx.at<float>(k+1,l+1)+Fx.at<float>(k+1,l-1))/12;
+					//printf("Horn_H(%d,%d): %f \n",k,l, Horn_H.at<float>(k,l));
+					Horn_V.at<float>(k,l) = (Fy.at<float>(k-1,l)+Fy.at<float>(k+1,l)+Fy.at<float>(k,l-1)+Fy.at<float>(k,l+1))/6+(Fy.at<float>(k-1,l-1)+Fy.at<float>(k-1,l+1)+Fy.at<float>(k+1,l+1)+Fy.at<float>(k+1,l-1))/12;
+					//printf("Horn_V(%d,%d): %f \n",k,l, Horn_V.at<float>(k,l));
+
+					r.at<float>(k,l) = (Ix.at<float>(k,l)*Horn_H.at<float>(k,l)+Iy.at<float>(k,l)*Horn_V.at<float>(k,l)+It.at<float>(k,l))/((Ix.at<float>(k,l)*Ix.at<float>(k,l))+(Iy.at<float>(k,l)*Iy.at<float>(k,l))+a);
+
+					tempFx.at<float>(k,l) = Horn_H.at<float>(k,l)-Ix.at<float>(k,l)*r.at<float>(k,l);
+					tempFy.at<float>(k,l) = Horn_V.at<float>(k,l)-Iy.at<float>(k,l)*r.at<float>(k,l);
+
+					}
+				}
+			//Fx.release();
+			Fx = tempFx.clone();
+			//Fy.release();
+			Fy = tempFy.clone();			
+			n+=1;
+			//printf("n= %d\n",n);
+			}
+		OF_H=Fx;
+		OF_V=Fy;
+		Draw_OF(OF_H, OF_V);
+		}

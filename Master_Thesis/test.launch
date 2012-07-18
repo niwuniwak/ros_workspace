@@ -1,0 +1,44 @@
+<!-- this node sets the rviz, planar_removal, passthrough filter etc useful or necessary for the image_plane_removal debugging -->
+
+<launch>
+<!-- Start Kinect camera
+ -->
+    <include file="$(find openni_camera)/launch/openni_node.launch" />
+
+<!-- Add homogeneous transformation to the different pointCloud (Kinect)-->
+    <node pkg="tf" type="static_transform_publisher" name="handeye_broadcaster" args="1.30900 0.0120342 0.500178 -0.0092 0.8729 0.0170 0.4876 /wam_fk/wam0 openni_camera 100" />
+
+    <node pkg="nodelet" type="nodelet" name="pcl_manager" args="manager" output="screen" />
+
+    <!-- Run a passthrough filter to remove background
+    <node pkg="nodelet" type="nodelet" name="passthrough" args="load pcl/PassThrough pcl_manager" output="screen">
+        <remap from="~input" to="/camera/rgb/points" />
+        <remap from="~output" to="/z_filtered/rgb/points" />
+        <rosparam>
+            filter_field_name: z
+            filter_limit_min: 0.0
+            filter_limit_max: 1.344
+            filter_limit_negative: False
+            keep_organized: True
+        </rosparam>
+    </node>
+ -->
+    <node name="image_plane_removal" pkg="iri_pcl_filters" type="planar_removal">
+        <rosparam>
+            max_num_of_planes_removed: 1
+        </rosparam>
+        <remap from="/planar_removal/pcl2/input" to="/z_filtered/rgb/points" />
+    </node>
+
+<!--
+-->
+    <node name="height_from_plane_map" pkg="iri_pcl_filters" type="height_from_plane_map">
+        <remap from="/height_from_plane_map/pcl2/input" to="/planar_removal/pcl2/output" />
+        <remap from="/height_from_plane_map/ModelCoefficients/input" to="/planar_removal/ModelCoefficients/output" />
+    </node>
+
+<!-- Starts RVIZ
+ -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find iri_pcl_filters)/vcg/height_map.vcg" output="screen" />
+
+</launch>    
